@@ -1,0 +1,13 @@
+app:
+  name: flink-freight-leads
+  script: "flink_freight_leads.py"
+  jarURI: "local:///opt/flink/opt/flink-python-1.20.3.jar"
+  parallelism: 2
+  upgradeMode: savepoint
+  state: running
+
+env:
+  - name: KAFKA_BOOTSTRAP
+    value: "kafka.kafka.svc.cluster.local:9092"
+  - name: SOME_FEATURE_FLAG
+    value: "freight-leads-v1"

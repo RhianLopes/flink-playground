@@ -1,0 +1,38 @@
+image:
+  repository: rhianlopes/flink-python-apps
+  tag: "3.0.11"
+  pullPolicy: Always
+
+flink:
+  namespace: flink
+  version: v1_20
+  configuration:
+    taskmanager.numberOfTaskSlots: "1"
+    state.checkpoints.dir: "file:///tmp/flink-checkpoints"
+    state.savepoints.dir: "file:///tmp/flink-savepoints"
+    python.client.executable: "/usr/bin/python3"
+    python.executable: "/usr/bin/python3"
+  jobManager:
+    replicas: 1
+    cpu: 1
+    memory: "1024m"
+  taskManager:
+    replicas: 2
+    cpu: 1
+    memory: "1024m"
+
+serviceAccount:
+  create: false
+  name: flink
+
+app:
+  name: flink-python-app
+  script: "main.py"
+  jarURI: "local:///opt/flink/opt/flink-python-1.20.3.jar"
+  parallelism: 1
+  upgradeMode: savepoint
+  state: running
+
+env:
+  - name: KAFKA_BOOTSTRAP
+    value: "kafka.kafka.svc.cluster.local:9092"

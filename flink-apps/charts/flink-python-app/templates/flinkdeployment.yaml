@@ -1,0 +1,43 @@
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: {{ .Values.app.name }}
+  namespace: {{ .Values.flink.namespace }}
+spec:
+  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+  flinkVersion: {{ .Values.flink.version }}
+  mode: native
+
+  serviceAccount: {{ .Values.serviceAccount.name }}
+
+  flinkConfiguration:
+    {{- range $k, $v := .Values.flink.configuration }}
+    {{ $k }}: "{{ $v }}"
+    {{- end }}
+
+  jobManager:
+    replicas: {{ .Values.flink.jobManager.replicas }}
+    resource:
+      cpu: {{ .Values.flink.jobManager.cpu }}
+      memory: "{{ .Values.flink.jobManager.memory }}"
+
+  taskManager:
+    replicas: {{ .Values.flink.taskManager.replicas }}
+    resource:
+      cpu: {{ .Values.flink.taskManager.cpu }}
+      memory: "{{ .Values.flink.taskManager.memory }}"
+
+  job:
+    jarURI: {{ .Values.app.jarURI | quote }}
+    entryClass: "org.apache.flink.client.python.PythonDriver"
+    args:
+      - "-py"
+      - "/opt/flink/usrlib/{{ .Values.app.script }}"
+    parallelism: {{ .Values.app.parallelism }}
+    upgradeMode: {{ .Values.app.upgradeMode }}
+    state: {{ .Values.app.state }}
+    env:
+      {{- range .Values.env }}
+      - name: {{ .name }}
+        value: {{ .value | quote }}
+      {{- end }}
