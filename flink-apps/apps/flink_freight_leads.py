@@ -23,34 +23,13 @@ KAFKA_BOOTSTRAP = os.getenv(
 )
 
 
-def row_list_to_dicts(
-    rows: Optional[List[Any]],
-    fields: List[str],
-) -> Optional[List[Dict[str, Any]]]:
-    """
-    Converte uma lista de Row (ARRAY<ROW(...)> vindo da Table API)
-    em lista de dict para poder serializar em JSON.
-    """
-    if rows is None:
-        return None
-    out: List[Dict[str, Any]] = []
-    for r in rows:
-        if r is None:
-            continue
-        d = {field: r[i] for i, field in enumerate(fields)}
-        out.append(d)
-    return out if out else None
-
 def create_tables_and_views(t_env: StreamTableEnvironment) -> None:
     t_env.execute_sql(f"""
         CREATE TABLE freight_events (
           freight_id  BIGINT,
           state       STRING,
           `timestamp` TIMESTAMP_LTZ(3),
-
-          -- headers do Kafka como metadata
           headers MAP<STRING, BYTES> METADATA FROM 'headers',
-
           WATERMARK FOR `timestamp` AS `timestamp` - INTERVAL '5' SECOND
         ) WITH (
           'connector' = 'kafka',
@@ -73,27 +52,6 @@ def create_tables_and_views(t_env: StreamTableEnvironment) -> None:
           `timestamp`,
           CAST(headers['EventType'] AS STRING) AS event_type
         FROM freight_events
-    """)
-
-    t_env.execute_sql(f"""
-        CREATE TABLE tracking_events (
-          event_type    STRING,
-          click_id      STRING,
-          freight_id    BIGINT,
-          trucker_uuid  STRING,
-          `timestamp`   TIMESTAMP_LTZ(3),
-          WATERMARK FOR `timestamp` AS `timestamp` - INTERVAL '5' SECOND
-        ) WITH (
-          'connector' = 'kafka',
-          'topic' = 'tracking.events',
-          'properties.bootstrap.servers' = '{KAFKA_BOOTSTRAP}',
-          'properties.security.protocol' = 'PLAINTEXT',
-          'properties.group.id' = 'tracking-events-consumer',
-          'scan.startup.mode' = 'earliest-offset',
-          'format' = 'json',
-          'json.ignore-parse-errors' = 'true',
-          'json.timestamp-format.standard' = 'ISO-8601'
-        )
     """)
 
     t_env.execute_sql("""
@@ -127,6 +85,46 @@ def create_tables_and_views(t_env: StreamTableEnvironment) -> None:
         GROUP BY freight_id
     """)
 
+    t_env.execute_sql(f"""
+        CREATE TABLE tracking_events (
+          event_type    STRING,
+          click_id      STRING,
+          freight_id    BIGINT,
+          trucker_uuid  STRING,
+          `timestamp`   TIMESTAMP_LTZ(3),
+          WATERMARK FOR `timestamp` AS `timestamp` - INTERVAL '5' SECOND
+        ) WITH (
+          'connector' = 'kafka',
+          'topic' = 'tracking.events',
+          'properties.bootstrap.servers' = '{KAFKA_BOOTSTRAP}',
+          'properties.security.protocol' = 'PLAINTEXT',
+          'properties.group.id' = 'tracking-events-consumer',
+          'scan.startup.mode' = 'earliest-offset',
+          'format' = 'json',
+          'json.ignore-parse-errors' = 'true',
+          'json.timestamp-format.standard' = 'ISO-8601'
+        )
+    """)
+
+
+def row_list_to_dicts(
+    rows: Optional[List[Any]],
+    fields: List[str],
+) -> Optional[List[Dict[str, Any]]]:
+    """
+    Converte uma lista de Row (ARRAY<ROW(...)> vindo da Table API)
+    em lista de dict para poder serializar em JSON.
+    """
+    if rows is None:
+        return None
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        if r is None:
+            continue
+        d = {field: r[i] for i, field in enumerate(fields)}
+        out.append(d)
+    return out if out else None
+
 
 def main() -> None:
     env = StreamExecutionEnvironment.get_execution_environment()
@@ -144,8 +142,6 @@ def main() -> None:
         FROM freight_history h
         JOIN freight_click_history c
           ON h.freight_id = c.freight_id
-        -- opcional:
-        -- WHERE CARDINALITY(c.click_history) > 0
     """)
 
     leads_changelog = t_env.to_changelog_stream(leads_table)
